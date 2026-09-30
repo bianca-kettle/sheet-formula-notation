@@ -52,8 +52,10 @@ test (see `tests/convert.test.ts`).
 
 ## Status
 
-Early skeleton. Handles single-cell and range references in both directions.
-Not yet handled: sheet-qualified references (`Sheet2!A1`), 3-D ranges, and
+Early skeleton. Handles single-cell and range references in both directions,
+including sheet-qualified ones (`Sheet2!A1`, `'My Sheet'!A1`); the sheet name
+is copied through untouched, even when it looks like a cell (`Q1!A1`).
+Not yet handled: 3-D ranges (`Sheet1:Sheet3!A1`) and
 whole-row/whole-column references (`R1C1` doesn't have a clean equivalent for
 `A:A`). See the project's roadmap for what's next.
 

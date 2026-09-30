@@ -26,33 +26,46 @@ function assertValidOrigin(origin: CellAddress): void {
   }
 }
 
-// Applies `transform` to every part of `formula` that lies outside a "quoted
-// string" literal, so cell-reference-shaped text inside a literal (e.g. the
-// formula =IF(A1="R1C1","yes","no")) is left untouched. Excel/Sheets escape a
-// literal quote inside a string as two double quotes in a row.
+// An unquoted sheet prefix such as Sheet2! or Q1!. Sheet names are free text, so
+// a name like Q1 or RC2 looks exactly like a cell reference and has to be
+// skipped rather than converted.
+const UNQUOTED_SHEET_PREFIX = /([A-Za-z_][A-Za-z0-9_.]*!)/;
+
+// Returns the index just past the closing `quote` of the literal starting at
+// `start`. A doubled quote inside the literal is an escaped quote, not the end.
+function skipQuoted(formula: string, start: number, quote: string): number {
+  let j = start + 1;
+  while (j < formula.length) {
+    if (formula[j] === quote) {
+      if (formula[j + 1] === quote) {
+        j += 2;
+        continue;
+      }
+      return j + 1;
+    }
+    j += 1;
+  }
+  return j;
+}
+
+// Applies `transform` to every part of `formula` that is not a "string literal"
+// or a 'quoted sheet name'!, and not an unquoted sheet name before "!". Text in
+// those places can look like a cell reference (the formula
+// =IF(A1="R1C1","yes","no"), or the sheet in ='Q1 B2'!A1) but is not one.
 function mapOutsideStringLiterals(formula: string, transform: (segment: string) => string): string {
   let result = '';
   let i = 0;
   while (i < formula.length) {
-    if (formula[i] === '"') {
-      let j = i + 1;
-      while (j < formula.length) {
-        if (formula[j] === '"') {
-          if (formula[j + 1] === '"') {
-            j += 2;
-            continue;
-          }
-          j += 1;
-          break;
-        }
-        j += 1;
-      }
+    if (formula[i] === '"' || formula[i] === "'") {
+      const j = skipQuoted(formula, i, formula[i]);
       result += formula.slice(i, j);
       i = j;
     } else {
       let j = i;
-      while (j < formula.length && formula[j] !== '"') j += 1;
-      result += transform(formula.slice(i, j));
+      while (j < formula.length && formula[j] !== '"' && formula[j] !== "'") j += 1;
+      const parts = formula.slice(i, j).split(UNQUOTED_SHEET_PREFIX);
+      // With a capture group, split puts the matched prefixes at odd indices.
+      result += parts.map((part, k) => (k % 2 === 1 ? part : transform(part))).join('');
       i = j;
     }
   }
